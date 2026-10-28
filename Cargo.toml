@@ -3,7 +3,7 @@ name = "mesh-wallet-lexe"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 version = "0.1.0"
-description = "Lexe Lightning wallet plugin for mesh-llm (wallet.v1), external plugin and reusable library"
+description = "Lexe-backed pay-lightning plugin with an embedded payment runtime"
 repository = "https://github.com/Mesh-LLM/lexe-wallet"
 readme = "README.md"
 
@@ -14,16 +14,14 @@ async-trait = "0.1"
 fs2 = "0.4"
 lexe = { version = "=0.1.24", features = ["unstable"] }
 lexe-api-core = { version = "=0.1.24" }
-mesh-llm-plugin = { git = "https://github.com/Mesh-LLM/mesh-llm", rev = "bd5514dd8de8db64d42975d04de0b0ad0583c7ba" }
-mesh-llm-wallet = { git = "https://github.com/Mesh-LLM/mesh-llm", rev = "bd5514dd8de8db64d42975d04de0b0ad0583c7ba", features = ["plugin-server"] }
+mesh-llm-pay-lightning = { git = "https://github.com/Mesh-LLM/mesh-llm", rev = "f97bd0e990711ccea67fc3731f83d336a86e8273" }
+mesh-llm-events = { git = "https://github.com/Mesh-LLM/mesh-llm", rev = "f97bd0e990711ccea67fc3731f83d336a86e8273" }
+mesh-llm-wallet = { git = "https://github.com/Mesh-LLM/mesh-llm", rev = "f97bd0e990711ccea67fc3731f83d336a86e8273" }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 tracing = "0.1"
 
 [dev-dependencies]
-mesh-llm-plugin-manager = { git = "https://github.com/Mesh-LLM/mesh-llm", rev = "bd5514dd8de8db64d42975d04de0b0ad0583c7ba" }
-flate2 = "1"
-tar = "0.4"
 serde_json = "1"
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt", "test-util"] }

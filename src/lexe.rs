@@ -38,7 +38,6 @@ pub struct LexeProvider {
 pub struct Opened {
     pub provider: LexeProvider,
     pub identity: WalletIdentity,
-    pub created: bool,
 }
 
 impl LexeProvider {
@@ -58,13 +57,11 @@ impl LexeProvider {
         lock.try_lock_exclusive()
             .context("wallet is already open; use the running node's wallet API")?;
         let seed_path = directory.join("seedphrase.txt");
-        let mut created = false;
         let seed = match RootSeed::read_from_path(&seed_path)
             .map_err(|_| anyhow::anyhow!("could not read wallet seed"))?
         {
             Some(seed) => seed,
             None => {
-                created = true;
                 let seed = RootSeed::generate();
                 seed.write_to_path(&seed_path)
                     .map_err(|_| anyhow::anyhow!("could not persist wallet seed"))?;
@@ -103,7 +100,6 @@ impl LexeProvider {
                 _lock: lock,
             },
             identity,
-            created,
         })
     }
 

@@ -1,47 +1,76 @@
-//! External Lexe wallet.v1 plugin and reusable backend entrypoint.
-//! The host owns payment policy; this library owns Lexe wallet I/O.
+//! Lightning plugin backed by the reusable Lexe wallet adapter.
 #![forbid(unsafe_code)]
-
 mod lexe;
-
-use std::path::Path;
-use std::sync::Arc;
-
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use async_trait::async_trait;
-use mesh_llm_plugin::PluginRuntime;
-use mesh_llm_wallet::backend::{OpenedWallet, WalletBackend};
-use mesh_llm_wallet::contract::WalletFeatures;
-use mesh_llm_wallet::plugin_server::wallet_plugin;
+use mesh_llm_wallet::{
+    provider::WalletProvider,
+    provisioning::{WalletFactory, WalletPin},
+};
+use std::{path::Path, sync::Arc};
 
-/// Plugin name the host launches this implementation under.
-pub const PLUGIN_NAME: &str = "lexe-wallet";
+pub const PLUGIN_NAME: &str = "pay-lightning";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-struct LexeBackend;
-
+/// Opens only this plugin's isolated `wallet/` subdirectory. No host-state migration.
+pub struct LexeFactory;
 #[async_trait]
-impl WalletBackend for LexeBackend {
-    fn provider_name(&self) -> &'static str {
-        "lexe"
+impl WalletFactory for LexeFactory {
+    fn is_provisioned(&self, directory: &Path) -> bool {
+        directory.join("wallet/seedphrase.txt").exists() || WalletPin::path(directory).exists()
     }
-
-    async fn open(&self, directory: &Path) -> Result<OpenedWallet> {
-        let opened = lexe::LexeProvider::open(directory).await?;
-        Ok(OpenedWallet {
-            identity: opened.identity,
-            provider: Arc::new(opened.provider),
-            created: opened.created,
-            features: WalletFeatures {
-                amountless_invoices: true,
-            },
-        })
+    async fn open(&self, directory: &Path) -> Result<Arc<dyn WalletProvider>> {
+        let pin = WalletPin::load(directory)?;
+        let wallet_directory = directory.join("wallet");
+        ensure!(
+            pin.is_none() || wallet_directory.join("seedphrase.txt").is_file(),
+            "pinned wallet seed missing; refusing to provision replacement"
+        );
+        let opened = lexe::LexeProvider::open(&wallet_directory).await?;
+        let actual = WalletPin {
+            plugin: PLUGIN_NAME.into(),
+            wallet_id: opened.identity.wallet_id,
+            provider: opened.identity.provider,
+            network: opened.identity.network,
+        };
+        if let Some(pin) = pin {
+            ensure!(
+                pin == actual,
+                "wallet identity changed; refusing replacement"
+            );
+        } else {
+            actual.store(directory)?;
+        }
+        Ok(Arc::new(opened.provider))
     }
 }
 
-/// Serve the `wallet.v1` capability on the host-supplied plugin endpoint until
-/// the host closes the connection. `name` is the plugin name the host launched
-/// this process under. Logging is owned by the launching binary.
+/// Launch with explicit isolated configuration, never adopting former host state.
 pub async fn run_plugin(name: String) -> Result<()> {
-    PluginRuntime::run(wallet_plugin(name, VERSION, LexeBackend)).await
+    mesh_llm_pay_lightning::run(
+        name,
+        VERSION,
+        LexeFactory,
+        mesh_llm_pay_lightning::Config::from_launch_env()?,
+    )
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn discovery_is_side_effect_free() {
+        let directory = tempfile::tempdir().unwrap();
+        let state = directory.path().join("absent");
+        assert!(!LexeFactory.is_provisioned(&state));
+        assert!(!state.exists());
+        std::fs::create_dir_all(state.join("wallet")).unwrap();
+        std::fs::write(
+            state.join("wallet/seedphrase.txt"),
+            "synthetic, never opened",
+        )
+        .unwrap();
+        assert!(LexeFactory.is_provisioned(&state));
+    }
 }
