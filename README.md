@@ -77,7 +77,11 @@ does not provision a wallet: the first host `wallet_open` request does.
 ## Development
 
 Use `just check`, `just test`, `just build`, and `just package`. Shared protocol
-crates are pinned to mesh source commit `51fd00a99806afa1bc1db0abbedc5d0702c9900b`.
+crates are pinned to mesh source commit `b78196e7c66f54b163c0a54d5b1ae0c6a8631b96`
+on the `ethanyzhang/mesh-llm` fork: `51fd00a99806afa1bc1db0abbedc5d0702c9900b`
+plus one commit adding the optional `Transaction.preimage` field
+(Mesh-LLM/mesh-llm#2731). It is a temporary pin until that field is on
+Mesh-LLM/mesh-llm `main`; moving to `main` also needs `OpenedWallet.features`.
 The Lexe SDK remains pinned to 0.1.24. `just package` packages the native host
 platform only; other targets must be built and validated on their platforms.
 The on-demand release workflow builds and tests native macOS, Linux and Windows
@@ -133,7 +137,8 @@ Backend and watcher extracted from Mesh-LLM/mesh-llm at
 `2129f4bb19862dfb425d27eaf9230cae90dbb850`, under `crates/mesh-wallet-lexe`.
 The dependency baseline is `51fd00a99806afa1bc1db0abbedc5d0702c9900b`;
 the extracted backend and shared contract sources are unchanged between these
-commits. The extraction revision records where the files were copied from, not a
+commits. The current pin adds only `Transaction.preimage` to that baseline (see
+[Development](#development)). The extraction revision records where the files were copied from, not a
 second protocol version. Shared contract implementation is a dependency, not a
 copied fork. Git dependencies require fetching the mesh repository; registry
 publication of this crate is not currently supported.
