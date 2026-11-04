@@ -13,7 +13,10 @@ use lexe::config::WalletEnvConfig;
 use lexe::types::auth::{CredentialsRef, RootSeed};
 use lexe::types::bitcoin::Amount;
 use lexe::types::command::CreateInvoiceRequest;
-use lexe::types::payment::{Payment, PaymentDirection, PaymentFilter, PaymentHash, PaymentKind};
+use lexe::types::payment::{
+    Payment, PaymentDirection, PaymentFilter, PaymentHash, PaymentKind, PaymentPreimage,
+};
+use lexe::util::ByteArray;
 use lexe::wallet::LexeWallet;
 use lexe_api_core::def::UserNodeRunApi;
 use lexe_api_core::models::command::{PayInvoicePreflightRequest, PayInvoiceRequest};
@@ -127,8 +130,19 @@ impl LexeProvider {
             status_msg: Some(payment.status_msg),
             created_at_ms: payment.created_at.to_millis(),
             settled_at_ms: payment.finalized_at.map(|time| time.to_millis()),
+            preimage: succeeded_preimage(status, payment.preimage),
         }
     }
+}
+
+/// The preimage of a succeeded payment as 64 hex digits. Lexe fills it for a
+/// completed payment; any other status reports none, so a pending or failed
+/// payment never carries one.
+fn succeeded_preimage(status: PaymentStatus, preimage: Option<PaymentPreimage>) -> Option<String> {
+    (status == PaymentStatus::Succeeded)
+        .then_some(preimage)
+        .flatten()
+        .map(|preimage| preimage.to_hex())
 }
 
 #[cfg(unix)]
@@ -397,6 +411,26 @@ fn is_claiming_status(status_msg: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use lexe::types::payment::PaymentPreimage;
+    use lexe::util::ByteArray;
+    use mesh_llm_wallet::provider::PaymentStatus;
+
+    #[test]
+    fn only_a_succeeded_payment_reports_its_preimage() {
+        let preimage = PaymentPreimage::from_array([0xab; 32]);
+        assert_eq!(
+            super::succeeded_preimage(PaymentStatus::Succeeded, Some(preimage)).as_deref(),
+            Some("ab".repeat(32).as_str())
+        );
+        for status in [PaymentStatus::Pending, PaymentStatus::Failed] {
+            assert_eq!(super::succeeded_preimage(status, Some(preimage)), None);
+        }
+        assert_eq!(
+            super::succeeded_preimage(PaymentStatus::Succeeded, None),
+            None
+        );
+    }
+
     #[test]
     fn claiming_is_normalized_from_the_display_status_only_for_pending_inbound() {
         assert!(super::is_claiming_status("claiming"));
