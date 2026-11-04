@@ -15,15 +15,19 @@ future opt-in build-time embedding. Mesh retains budgets, ledger and recovery.
 
 ## Install the external plugin
 
+A wallet does nothing on its own: paid inference comes from the
+[`pay-lightning`](https://github.com/Mesh-LLM/ln-payments-plugin) plugin, which
+reaches this wallet through the host. Install both together:
+
 ```sh
-mesh-llm plugins install Mesh-LLM/lexe-wallet
+mesh-llm plugins install Mesh-LLM/lexe-wallet-plugin Mesh-LLM/ln-payments-plugin
 ```
 
 Restart your normal mesh node. Installed, enabled plugins are discovered by the
-host. MeshLLM v0.78.0 includes the payment infrastructure and uses external
-wallet plugins; Lexe wallet v0.1.0 is available in this repository's releases.
-No manual executable path or built-in Lexe feature is needed. Check the release
-assets for your platform; a packaged target is not proof of live-money qualification.
+host. This needs mesh-llm `main` at `b63cea23c` or later, or the first release
+after v0.78.0, which moved payments out of the node into plugins. No manual
+executable path or built-in Lexe feature is needed. Check the release assets for
+your platform; a packaged target is not proof of live-money qualification.
 
 Choose the profile **before the first wallet operation**. An explicit
 `--config /absolute/path/payer/config.toml` stores payment state in
