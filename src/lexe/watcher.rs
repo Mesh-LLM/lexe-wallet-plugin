@@ -247,7 +247,7 @@ mod tests {
                 .push((Instant::now(), req.start_index));
             let fail = self
                 .failures
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1))
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1))
                 .is_ok();
             let result = if fail {
                 Err(anyhow::anyhow!("mock poll failure"))
