@@ -1,0 +1,58 @@
+name: CI
+# The pull request gate: the documented check (`just check`, `just test`) and the release scripts'
+# unit tests on Linux, macOS and Windows, plus a Linux package build, each job with a cache so it
+# finishes under 10 minutes. The release build on all six targets runs after merge (release.yml).
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            package: x86_64-unknown-linux-gnu
+          - runner: macos-15
+          - runner: windows-2022
+    name: check (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable action
+        with:
+          toolchain: 1.97.0
+          components: rustfmt, clippy
+      # Keyed on the runner, toolchain, Cargo.lock and Cargo.toml; pull requests restore main's cache.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3
+        with:
+          just-version: 1.58.0
+      - name: Check and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+          just check
+          just test
+      - name: Package and verify
+        if: matrix.package
+        shell: bash
+        env:
+          TARGET: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          just package
+          just verify-package "$TARGET"

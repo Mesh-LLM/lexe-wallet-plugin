@@ -2,8 +2,13 @@
 
 The **Release wallet** workflow runs the full Rust checks and test suite, builds
 natively on six GitHub-hosted runners, packages the installer archive, verifies
-its checksum/metadata/executable, and uploads artifacts. PRs build but cannot
-publish. No tests provision wallets, contact live wallet services or move money.
+its checksum/metadata/executable, and uploads artifacts. It runs after every
+merge to main, nightly and on demand; a red run on main or nightly opens or
+comments on a `ci-red` issue. Pull requests are gated by the faster **CI**
+workflow (`ci.yml`: the same checks and tests on Linux, macOS and Windows, and
+a Linux package).
+Only a dispatch with publish=true publishes. No tests provision wallets,
+contact live wallet services or move money.
 
 On-demand build without publication:
 

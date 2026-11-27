@@ -1,6 +1,13 @@
 name: Release wallet
+# The full six-target check, test and release-package matrix. It takes longer than the 10-minute
+# pull request budget (runner queues and an uncached release build on every target), so it runs
+# after merge on main, nightly and on demand; ci.yml is the pull request gate. A red run on main or
+# nightly opens (or comments on) a ci-red issue the same day.
 on:
-  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 9 * * *'
   workflow_dispatch:
     inputs:
       publish:
@@ -9,9 +16,8 @@ on:
         default: false
 permissions:
   contents: read
-concurrency:
-  group: wallet-release-${{ github.ref }}
-  cancel-in-progress: false
+# No workflow-level concurrency group: GitHub keeps only one pending run per group, so a nightly or
+# second merge would cancel a waiting post-merge run. Only publication is serialized (publish job).
 jobs:
   build:
     strategy:
@@ -90,6 +96,9 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    concurrency:
+      group: wallet-publish
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -106,3 +115,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: python3 scripts/release.py
+  report-red:
+    if: failure() && github.event_name != 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the ci-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh label create ci-red --color B60205 --description 'Post-merge or nightly CI is red' --force
+          body="Release wallet matrix failed on \`$REF\` ($EVENT) at $SHA: $RUN_URL"
+          number=$(gh issue list --label ci-red --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --label ci-red --title "CI red: Release wallet matrix on $REF" --body "$body"
+          fi
