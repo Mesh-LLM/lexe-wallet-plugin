@@ -130,13 +130,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EVENT: ${{ github.event_name }}
           SHA: ${{ github.sha }}
+          REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           gh label create ci-red --color B60205 --description 'Post-merge or nightly CI is red' --force
-          body="Release wallet matrix failed on \`main\` ($EVENT) at $SHA: $RUN_URL"
+          body="Release wallet matrix failed on \`$REF\` ($EVENT) at $SHA: $RUN_URL"
           number=$(gh issue list --label ci-red --state open --limit 1 --json number --jq '.[0].number // empty')
           if [ -n "$number" ]; then
             gh issue comment "$number" --body "$body"
           else
-            gh issue create --label ci-red --title 'CI red: Release wallet matrix on main' --body "$body"
+            gh issue create --label ci-red --title "CI red: Release wallet matrix on $REF" --body "$body"
           fi
